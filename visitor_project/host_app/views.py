@@ -1,16 +1,18 @@
 from django.shortcuts import render
-from .models import Host, Department
+from .models import Host
+from visitor_app.models import Visitor
+from visitor_app.serializers import VisitorSerializer
 from .serializers import HostSerializer, LoginSerializer, DepartmentSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 # Create your views here.
 class DepartmentRegistrationView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminUser]
     serializer_class = DepartmentSerializer
     
     def post(self, request):
@@ -36,7 +38,7 @@ class LoginView(APIView):
     serializer_class = LoginSerializer
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = LoginSerializer(data=request.data,context={'request': request})
         if serializer.is_valid():
             user = serializer.validated_data['user']
             
@@ -54,7 +56,7 @@ class LoginView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
     
 class ModifyHostView(APIView):
-    # permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAdminUser]
     serializer_class = HostSerializer    
     def get(self, request, pk=None, format=None):
         id=pk
@@ -104,3 +106,18 @@ class ModifyHostView(APIView):
             return Response({'msg':'Data Deleted!'})
         except Host.DoesNotExist:
             return Response({"msg":"Host doesnot exist!"}, status=status.HTTP_404_NOT_FOUND)
+        
+class ListHostView(ListAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = Host.objects.all()
+
+class YourVisitorView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        host = request.user
+        visitors = Visitor.objects.filter(visiting_to=host)
+
+        if visitors.exists():
+            serializer = VisitorSerializer(visitors, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"msg":"You are not appointed yet!"}, status=status.HTTP_404_NOT_FOUND)
