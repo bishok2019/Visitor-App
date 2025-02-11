@@ -2,6 +2,7 @@
 from rest_framework import serializers
 from .models import Host, Department
 from django.contrib.auth import authenticate
+from visitor_app.models import Visitor
 
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,11 +13,12 @@ class HostSerializer(serializers.ModelSerializer):
     # username = serializers.CharField()
     password = serializers.CharField(write_only=True)
     # department = serializers.CharField(required=True)
-    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=True)
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), required=True, write_only = True)
+    depart = serializers.CharField(source='department.name', read_only=True)
     
     class Meta:
         model = Host
-        fields = ('id', 'username', 'email', 'password','department')
+        fields = ('id', 'username', 'email', 'password','department','depart')
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -49,3 +51,9 @@ class LoginSerializer(serializers.Serializer):
             attrs['user'] = user
             return attrs
         raise serializers.ValidationError('Must include "email" and "password".')
+    
+class RescheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Visitor
+        fields = ['id','name', 'meeting_date', 'meeting_time','status']
+        read_only_fields = ['id','name',]

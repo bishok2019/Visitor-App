@@ -1,8 +1,8 @@
-from django.shortcuts import render
+from django.shortcuts import render,get_object_or_404
 from .models import Host
 from visitor_app.models import Visitor
 from visitor_app.serializers import VisitorSerializer
-from .serializers import HostSerializer, LoginSerializer, DepartmentSerializer
+from .serializers import HostSerializer, LoginSerializer, DepartmentSerializer, RescheduleSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -33,7 +33,7 @@ class HostRegistrationView(APIView):
             return Response({'status': 'success','message': 'Host created successfully.','data': HostSerializer(host).data}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-class LoginView(APIView):
+class HostLoginView(APIView):
     permission_classes = [AllowAny]
     serializer_class = LoginSerializer
 
@@ -59,60 +59,39 @@ class ModifyHostView(APIView):
     permission_classes = [IsAdminUser]
     serializer_class = HostSerializer    
     def get(self, request, pk=None, format=None):
-        id=pk
-        if id is not None:
-            try:
-                host=Host.objects.get(id=id)
-                serializer = HostSerializer(host)
-                return Response(serializer.data)
-            except Host.DoesNotExist:
-                return Response({"msg":"Host doesnot exist!"}, status=status.HTTP_404_NOT_FOUND)
-                    
-        host = Host.objects.all()
-        serializer = HostSerializer(host, many=True)
-        return Response(serializer.data)
+        host = Host.objects.filter(pk=pk)
+        if not host.exists():
+            return Response({"msg": "Host not found."}, status=status.HTTP_404_NOT_FOUND)
+        host = host.first()
+        serializer = HostSerializer(host)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     def patch(self, request, pk=None, format=None):
-        id=pk
-        try:
-            host = Host.objects.get(pk=id)
-        except Host.DoesNotExist:
-            return Response({"msg":"Host Does not Exist!"}, status=status.HTTP_404_NOT_FOUND)
-            
+        host = Host.objects.filter(pk=pk)
+        if not host.exists:
+            return Response({"msg":"Host Deosnot exist!"}, status=status.HTTP_404_NOT_FOUND)
+        host = host.first()
         serializer = HostSerializer(host, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response({'msg':'Partial Data Updated!'})
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def put(self, request, pk=None, format=None):
-        id=pk
-        try:
-            host = Host.objects.get(pk=id)
-        except Host.DoesNotExist:
-            return Response({"msg":"host Does not Exist!"}, status=status.HTTP_404_NOT_FOUND)
-            
-        serializer = HostSerializer(host, data=request.data,)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'msg':'Complete Data Updated!'})
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"msg":"Partial Data Updated !!"})
     
     def delete(self, request, pk=None, format=None):
-        id=pk
-        try:
-            host = Host.objects.get(pk=id)
-            host.delete()
-            return Response({'msg':'Data Deleted!'})
-        except Host.DoesNotExist:
-            return Response({"msg":"Host doesnot exist!"}, status=status.HTTP_404_NOT_FOUND)
-        
+        host = Host.objects.filter(pk=pk)
+        if not host.exists:
+            return Response({"msg":"Host Deosnot exist!"}, status=status.HTTP_404_NOT_FOUND)
+        host = host.first()
+        host.delete()
+        return Response({'msg': 'Data Deleted!'}, status=status.HTTP_204_NO_CONTENT)
+    
 class ListHostView(ListAPIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [AllowAny]
     queryset = Host.objects.all()
+    serializer_class = HostSerializer
 
-class YourVisitorView(APIView):
+class YourAppointmentView(APIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = VisitorSerializer
     def get(self, request):
         host = request.user
         visitors = Visitor.objects.filter(visiting_to=host)
@@ -120,4 +99,49 @@ class YourVisitorView(APIView):
         if visitors.exists():
             serializer = VisitorSerializer(visitors, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response({"msg":"You are not appointed yet!"}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"msg":"You have no appointment for now!"}, status=status.HTTP_404_NOT_FOUND)
+
+class GetYourHostInfo(APIView):
+    permission_classes=[IsAuthenticated]
+    serializer_class = HostSerializer
+    def get(self, request):
+        host= request.user
+        serializer = HostSerializer(host)
+        return Response(serializer.data)
+            
+class RescheduleVisitor(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = RescheduleSerializer    
+
+    def get(self, request,pk=None):
+        host = request.user
+        visitors = Visitor.objects.filter(pk=pk, visiting_to=host)
+
+        if visitors.exists():
+            serializer = RescheduleSerializer(visitors, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"msg": "Appointment not found."}, status=status.HTTP_404_NOT_FOUND)
+    
+    def patch(self, request, pk=None, format=None):
+        host = request.user
+        visitor = Visitor.objects.filter(pk=pk, visiting_to=host).first()
+        if not visitor:
+            return Response({"msg": "Appointment not found."},status=status.HTTP_404_NOT_FOUND)
+        if visitor.visiting_to!=host:
+            return Response(
+                {"msg": "You do not have permission to reschedule this appointment."},status=status.HTTP_403_FORBIDDEN)
+        serializer = RescheduleSerializer(visitor, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'msg': 'Appointment successfully rescheduled!'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self, request, pk=None, format=None):
+        host = request.user
+        visitor = Visitor.objects.filter(pk=pk,visiting_to=host)
+        if not visitor:
+            return Response({"msg": "Appointment not found."},status=status.HTTP_404_NOT_FOUND)
+        if visitor.visiting_to != request.user:
+            return Response({"msg": "You do not have permission to delete this appointment."},status=status.HTTP_403_FORBIDDEN)
+        visitor.delete()
+        return Response({'msg': 'Appointment successfully deleted!'}, status=status.HTTP_204_NO_CONTENT)

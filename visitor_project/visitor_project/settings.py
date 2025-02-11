@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'visitor_app',
     'host_app',
     'rest_framework',
+    # 'drf_yasg',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -125,3 +127,16 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'host_app.Host'
+
+MEDIA_ROOT =BASE_DIR/"media"
+MEDIA_URL = '/media/'
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'My API',
+    'DESCRIPTION': 'API documentation',
+    'VERSION': '1.0.0',
+}
