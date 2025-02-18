@@ -1,4 +1,4 @@
-#models.py
+#visitor_app/models.py
 from django.db import models
 # Create your models here.
 from django.db import models

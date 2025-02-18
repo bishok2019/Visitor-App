@@ -53,7 +53,25 @@ class LoginSerializer(serializers.Serializer):
         raise serializers.ValidationError('Must include "email" and "password".')
     
 class RescheduleSerializer(serializers.ModelSerializer):
+    visiting_to = serializers.CharField(source='visiting_to.username')
     class Meta:
         model = Visitor
-        fields = ['id','name', 'meeting_date', 'meeting_time','status']
-        read_only_fields = ['id','name',]
+        fields = ['id','meeting_date', 'meeting_time','status','visiting_to']
+        read_only_fields = ['id','visiting_to']
+        # read_only_fields = ['id','name','email','photo','visiting_to','reason','department']
+
+    # def validate(self, data):
+    #     allowed_fields = {'meeting_date', 'meeting_time'}
+    #     invalid_fields = set(data.keys()) - allowed_fields
+
+    #     if invalid_fields:
+    #         raise serializers.ValidationError(
+    #             {field: "This field cannot be modified." for field in invalid_fields}
+    #         )
+    #     return data
+
+    # def update(self, instance, validated_data):
+    #     instance.meeting_date = validated_data.get('meeting_date', instance.meeting_date)
+    #     instance.meeting_time = validated_data.get('meeting_time', instance.meeting_time)
+    #     instance.save()
+    #     return instance
